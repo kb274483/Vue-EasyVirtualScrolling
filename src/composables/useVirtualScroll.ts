@@ -30,6 +30,8 @@ export function useVirtualScroll(
   
   // 觀察器
   let resizeObserver: ResizeObserver | null = null
+  // rAF ID 控制更新
+  let rafId: number | null = null
 
   function readViewportSize(el: HTMLElement) {
     viewportSize.value = direction.value === 'vertical' ? el.clientHeight : el.clientWidth
@@ -52,8 +54,13 @@ export function useVirtualScroll(
   }
 
   function handleScroll(){
-    if (!containerRef.value) return
-    updateRange(containerRef.value)
+    if (rafId != null) return
+
+    rafId = requestAnimationFrame(()=>{
+      if (!containerRef.value) return
+      rafId = null
+      updateRange(containerRef.value)
+    })
   }
 
   function scrollToOffset(value: number){
@@ -95,6 +102,10 @@ export function useVirtualScroll(
     if (resizeObserver) {
       resizeObserver.disconnect()
       resizeObserver = null
+    }
+    if (rafId != null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
     }
   })
 

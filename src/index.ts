@@ -1,17 +1,12 @@
 import type { App } from 'vue'
+import VirtualList from './components/VirtualList.vue'
 
-// Placeholder component export for scaffold; replace with real components later
-export const VirtualScrollPlaceholder = {
-  name: 'VirtualScrollPlaceholder',
-  render() {
-    return null
-  }
-}
+export { default as VirtualList } from './components/VirtualList.vue'
 
 export default {
   install(app: App) {
-    app.component('VirtualScrollPlaceholder', VirtualScrollPlaceholder)
+    app.component('VirtualList', VirtualList)
   }
 }
 
-export * from '@/types'
+export * from './types'
