@@ -12,6 +12,7 @@ export interface VScrollOptions{
   itemSize: number  | Ref<number>
   itemCount: number  | Ref<number>
   overscan: number
+  dynamic?: boolean
 }
 
 export interface ScrollPayload {
@@ -23,4 +24,8 @@ export interface ScrollPayload {
 export interface ResizePayload {
   width: number
   height: number
+}
+
+export interface SizeCache {
+  [index: number]: number
 }

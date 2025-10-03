@@ -2,24 +2,24 @@
   <component
     :is="tag"
     ref="containerRef"
-    :class="['vs-container', containerClass]"
+    :class="[containerClass]"
     :style="containerStyles"
     @scroll.passive="onScroll"
   >
     <component
       :is="innerTag"
-      :class="['vs-inner', innerClass]"
+      :class="[innerClass]"
       :style="innerStyles"
     >
       <div
-        class="vs-transformer"
         :style="transformStyles"
       >
         <component
           v-for="(item, i) in visibleItems"
+          :ref="(el: HTMLElement | null)=> handleMeasure(el, i)"
           :is="itemTag"
           :key="keyFor(item, range.start + i)"
-          :class="['vs-item', itemClass]"
+          :class="[itemClass]"
           :style="itemStyles"
           @click="onItemClick(item, range.start + i, $event)"
         >
@@ -49,6 +49,7 @@
     overscan?: number
     height?: number | string
     direction?: Direction
+    dynamic?: boolean
     tag?: string
     innerTag?: string
     itemTag?: string
@@ -64,6 +65,7 @@
   const props = withDefaults(defineProps<Props<Item>>(), {
     overscan: 5,
     direction: 'vertical',
+    dynamic: false,
     tag: 'div',
     innerTag: 'div',
     itemTag: 'div'
@@ -82,13 +84,14 @@
 
   const containerRef = ref<HTMLElement | null>(null)
 
-  const { range, offset, totalSize, viewportSize, scrollOffset, atStart, atEnd, handleScroll, scrollToIndex, scrollToOffset, scrollToTop } =
-    useVirtualScroll(containerRef, {
-      itemCount: computed(() => props.items.length),
-      itemSize: computed(() => props.itemSize),
-      overscan: props.overscan,
-      direction: props.direction
-    })
+  const { range, offset, totalSize, viewportSize, scrollOffset, atStart, atEnd, handleScroll, scrollToIndex, scrollToOffset, scrollToTop, measure, unmeasure
+  } = useVirtualScroll(containerRef, {
+        itemCount: computed(() => props.items.length),
+        itemSize: computed(() => props.itemSize),
+        overscan: props.overscan,
+        direction: props.direction,
+        dynamic: props.dynamic
+      })
 
   const visibleItems = computed<Item[]>(() => {
     if (range.value.end < range.value.start) return []
@@ -161,6 +164,16 @@
   })
 
   const itemStyles = computed<CSSProperties>(() => {
+    if(props.dynamic){
+      const isVertical = props.direction === 'vertical'
+      const base: CSSProperties = {
+        boxSizing: 'border-box'
+      }
+      if(!isVertical){
+        base.display = 'inline-block'
+      }
+      return { ...base, ...(props.itemStyle || {}) }
+    }
     const isVertical = props.direction === 'vertical'
     const base: CSSProperties = isVertical
       ? { height: `${props.itemSize}px`, boxSizing: 'border-box' }
@@ -168,10 +181,17 @@
     return { ...base, ...(props.itemStyle || {}) }
   })
 
+  function handleMeasure(el: HTMLElement | null, index: number){
+    if(!props.dynamic) return
+
+    const ele = el as HTMLElement | null
+    if(ele) measure(range.value.start + index, ele)
+    else unmeasure(range.value.start + index)
+  }
   defineExpose({
     scrollToIndex,
     scrollToOffset,
     scrollToTop,
-    getVisibleRange: () => range.value
+    getVisibleRange: () => range.value,
   })
 </script>

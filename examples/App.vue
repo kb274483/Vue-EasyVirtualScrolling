@@ -6,12 +6,14 @@
         :items="testData"
         :item-size="100"
         :height="'100%'"
+        :dynamic="true"
         key-field="id"
         @scroll="onScroll"
       >
         <template #default="{ item, index }">
-          <div style="height:100px; display:flex; align-items:center; padding:0 12px; border-bottom:1px solid #eee">
-            {{ item.text }} - #{{ index }}
+          <div style="height:100%; padding:0 12px; border-bottom:1px solid #eee;">
+            #{{ index }}---
+            <p>{{ item.text }}</p>
           </div>
         </template>
       </VirtualList>
@@ -23,13 +25,13 @@
 import { VirtualList } from '../src' 
 import { onMounted, ref } from 'vue'
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+// const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 let testData = ref([])
 onMounted(async () => {
-  await sleep(1000)
+  // await sleep(1000)
   for (let i = 0; i < 10000; i++) {
     testData.value.push({
-      text: `item ${i}`,
+      text: 'Lorem ipsum '.repeat(Math.floor(Math.random() * 50) + 1),
       id: i
     })
   }

@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, type Ref} from 'vue'
 import type { VScrollOptions, VirtualRange, Direction } from '@/types'
+import { useDynamicSize } from '@/composables/useDynamicSize'
 
 export function useVirtualScroll(
   containerRef: Ref<HTMLElement | null>,
@@ -11,10 +12,12 @@ export function useVirtualScroll(
     () => typeof options.direction === 'string' ? options.direction : options.direction.value)
   const itemSize  = computed(() => typeof options.itemSize  === 'number' ? options.itemSize  : options.itemSize.value)
   const itemCount = computed(() => typeof options.itemCount === 'number' ? options.itemCount : options.itemCount.value)
-
+  const isDynamic = computed(() => options.dynamic ?? false)
 
   const viewportSize = ref(0)
   const scrollOffset = ref(0)
+
+  const dynamicSize = useDynamicSize(direction, itemSize, itemCount)
   
   // 計算可見的項目數
   const visibleCount = computed(()=>{
@@ -23,10 +26,16 @@ export function useVirtualScroll(
   }) 
 
   const range = ref<VirtualRange>({start: 0, end: -1})
+
+  // 計算高度
   const totalSize = computed(()=>{
+    if(isDynamic.value) return dynamicSize.caleTotalSize()
     return itemCount.value * itemSize.value
   })
-  const offset = computed(()=> range.value.start * itemSize.value)
+  const offset = computed(()=> isDynamic.value
+    ? dynamicSize.getItemOffset(range.value.start)
+    : range.value.start * itemSize.value 
+  )
   
   // 觀察器
   let resizeObserver: ResizeObserver | null = null
@@ -40,12 +49,33 @@ export function useVirtualScroll(
   function updateRange(el: HTMLElement){
     const current = direction.value === 'vertical' ? el.scrollTop : el.scrollLeft
     scrollOffset.value = current
-    // 計算首尾索引
-    const start = Math.floor(current / Math.max(1, itemSize.value))
-    const end = Math.min(
-      itemCount.value - 1,
-      start + Math.max(0, visibleCount.value) + overscan.value - 1
-    )
+    
+    let start: number
+    let end: number
+
+    if(isDynamic.value){
+      // 動態累加計算 可視區域的範圍
+      start = dynamicSize.findStartIndex(current)
+      let accSize = 0
+      end = start
+      while( 
+        end < itemCount.value && 
+        accSize < viewportSize.value + overscan.value * itemSize.value
+      ){
+        accSize += dynamicSize.getItemSize(end)
+        end++
+      }
+      end = Math.min(end - 1, itemCount.value - 1)
+      //  確保end 不小於start，避免render空白
+      if (end < start) end = start
+    }else{
+      // 計算首尾索引
+      start = Math.floor(current / Math.max(1, itemSize.value))
+      end = Math.min(
+        itemCount.value - 1,
+        start + Math.max(0, visibleCount.value) + overscan.value - 1
+      )
+    }
     // 更新範圍 start 需要再減掉 overscan
     const next: VirtualRange = {start: Math.max(0, start - overscan.value), end}
     if (next.start !== range.value.start || next.end !== range.value.end) {
@@ -72,10 +102,21 @@ export function useVirtualScroll(
 
   function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start'){
     index = Math.max(0, Math.min(index, itemCount.value - 1))
-    let target = index * itemSize.value
-    if(align !== 'start' && viewportSize.value > 0){
-      if (align === 'center') target = target - viewportSize.value / 2 + itemSize.value / 2
-      if (align === 'end') target = target - viewportSize.value + itemSize.value
+    let target: number
+    if(isDynamic.value){
+      target = dynamicSize.getItemOffset(index)
+      const size = dynamicSize.getItemSize(index)
+
+      if(align !== 'start' && viewportSize.value > 0){
+        if (align === 'center') target = target - viewportSize.value / 2 + size / 2
+        if (align === 'end') target = target - viewportSize.value + size
+      }
+    }else{
+      target = index * itemSize.value
+      if(align !== 'start' && viewportSize.value > 0){
+        if (align === 'center') target = target - viewportSize.value / 2 + itemSize.value / 2
+        if (align === 'end') target = target - viewportSize.value + itemSize.value
+      }
     }
     scrollToOffset(Math.max(0, Math.min(totalSize.value - viewportSize.value, target)))
   }
@@ -110,6 +151,7 @@ export function useVirtualScroll(
   })
 
   watch([itemCount, itemSize], () => {
+    if(isDynamic.value) dynamicSize.clearAll()
     const el = containerRef.value
     if (!el) return
     updateRange(el)
@@ -135,5 +177,7 @@ export function useVirtualScroll(
     scrollToOffset,
     scrollToIndex,
     scrollToTop,
+    measure :dynamicSize.observerItem,
+    unmeasure: dynamicSize.unObserverItem,
   }
 }
