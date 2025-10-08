@@ -7,8 +7,30 @@ export function useDynamicSize(
   itemCount: Ref<number>,
 ){
   const sizeCache = ref<SizeCache>({})
-  const itemObservers = new Map<number, ResizeObserver>()
   const positionCache = ref<number[]>([])
+  let resizeObserver: ResizeObserver | null = null
+  const eleByIdx = new Map<number, HTMLElement>()
+  let idxByEle = new WeakMap<HTMLElement, number>()
+
+  function initObserver(){
+    if(resizeObserver) return resizeObserver
+    resizeObserver = new ResizeObserver((entries)=>{
+      for(const entry of entries){
+        const el = entry.target as HTMLElement
+        const idx = idxByEle.get(el)
+        if(idx == null) continue
+
+        const measured = direction.value === 'vertical' 
+          ? (entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height)
+          : (entry.borderBoxSize?.[0]?.inlineSize ?? entry.target.getBoundingClientRect().width)
+
+        if(Number.isFinite(measured) && measured > 0){
+          setItemSize(idx, measured)
+        }
+      }
+    })
+    return resizeObserver
+  }
 
   // 取得Cache或是預估高度
   function getItemSize(index: number): number{
@@ -74,36 +96,39 @@ export function useDynamicSize(
   }
 
   function observerItem(index: number, ele: HTMLElement){
-    if(itemObservers.has(index)) return
+    const observer = initObserver()
+    const prev = eleByIdx.get(index)
+    if(prev && prev !== ele){
+      observer.unobserve(prev)
+      idxByEle.delete(prev)
+    }
 
-    const observer = new ResizeObserver((entries)=>{
-      for(const entry of entries){
-        const measured = direction.value === 'vertical' 
-          ? (entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height)
-          : (entry.borderBoxSize?.[0]?.inlineSize ?? entry.target.getBoundingClientRect().width)
-
-        // 忽略非數值或小於等於 0，避免尺寸覆寫為 0
-        if (Number.isFinite(measured) && measured > 0) {
-          setItemSize(index, measured)
-        }
-      }
-    })
+    eleByIdx.set(index, ele)
+    idxByEle.set(ele, index)
 
     observer.observe(ele)
-    itemObservers.set(index, observer)
   }
 
   function unObserverItem(index: number){
-    const observer = itemObservers.get(index)
-    if(observer){
-      observer.disconnect()
-      itemObservers.delete(index)
+    const observer = initObserver()
+    const ele = eleByIdx.get(index)
+    if(observer && ele){
+      observer.unobserve(ele)
     }
+    if(ele){
+      idxByEle.delete(ele)
+    }
+    eleByIdx.delete(index)
   }
 
   function clearAll(){
-    itemObservers.forEach(observer => observer.disconnect())
-    itemObservers.clear()
+    if(resizeObserver){
+      resizeObserver.disconnect()
+      resizeObserver = null
+    }
+    eleByIdx.clear()
+    idxByEle = new WeakMap<HTMLElement, number>()
+
     sizeCache.value = {}
     positionCache.value = []
   }
