@@ -35,7 +35,7 @@
   import type { CSSProperties } from 'vue'
   import { useVirtualScroll } from '@/composables/useVirtualScroll'
   import type { Direction, VirtualRange, ScrollPayload, ResizePayload } from '@/types'
-  import { throttle } from '@/utils/common'
+  import { rafThrottle } from '@/utils/common'
 
   type Item = unknown
   type ClassType =
@@ -74,17 +74,38 @@
   const emit = defineEmits<{
     (e: 'scroll', payload: ScrollPayload): void
     (e: 'range-change', payload: VirtualRange): void
-    (e: 'reach-start'): void
-    (e: 'reach-end'): void
+    (e: 'reach-start', payload: boolean): void
+    (e: 'reach-end', payload: boolean): void
     (e: 'item-click', payload: { item: Item; index: number; event: MouseEvent }): void
     (e: 'resize', payload: ResizePayload): void
   }>()
 
-  const emitThrottled = throttle(emit as (...args: unknown[]) => void, 320)
+  const emitScroll = rafThrottle(()=>{
+    const el = containerRef.value
+    if(!el) return
+    const scrollOffset = props.direction === 'vertical' ? el.scrollTop : el.scrollLeft
+    emit('scroll', { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft, scrollOffset: scrollOffset })
+  })
+
+  const emitRangeChange = rafThrottle((...args: unknown[]) => {
+    const [next] = args as [VirtualRange]
+    emit('range-change', next)
+  })
+
+  const emitItemClick = rafThrottle((...args: unknown[]) => {
+    const [item, index, event] = args as [Item, number, MouseEvent]
+    emit('item-click', { item, index, event })
+  })
+
+  const emitResize = rafThrottle(()=>{
+    const el = containerRef.value
+    if(!el) return
+    emit('resize', { width: el.clientWidth, height: el.clientHeight })
+  })
 
   const containerRef = ref<HTMLElement | null>(null)
 
-  const { range, offset, totalSize, viewportSize, scrollOffset, atStart, atEnd, handleScroll, scrollToIndex, scrollToOffset, scrollToTop, measure, unmeasure
+  const { range, offset, totalSize, viewportSize, atStart, atEnd, handleScroll, scrollToIndex, scrollToOffset, scrollToTop, measure, unmeasure
   } = useVirtualScroll(containerRef, {
         itemCount: computed(() => props.items.length),
         itemSize: computed(() => props.itemSize),
@@ -98,27 +119,24 @@
     return props.items.slice(range.value.start, range.value.end + 1)
   })
 
-  function onScroll(e: Event) {
-    const el = e.target as HTMLElement
+  function onScroll() {
     handleScroll()
-    emitThrottled('scroll', { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft, scrollOffset: scrollOffset.value })
+    emitScroll()
   }
 
   watch(range, (next, prev) => {
     if (!prev || next.start !== prev.start || next.end !== prev.end) {
-      emitThrottled('range-change', next)
+      emitRangeChange(next)
     }
   })
 
   watch([atStart, atEnd], ([s, e]) => {
-    if (s) emitThrottled('reach-start')
-    if (e) emitThrottled('reach-end')
-  })
+    if (s) emit('reach-start', true)
+    if (e) emit('reach-end', true)
+  },{immediate: true})
 
   watch(viewportSize, () => {
-    const el = containerRef.value
-    if (!el) return
-    emitThrottled('resize', { width: el.clientWidth, height: el.clientHeight })
+    emitResize()
   })
 
   function keyFor(item: Item, index: number) {
@@ -130,13 +148,14 @@
   }
 
   function onItemClick(item: Item, index: number, event: MouseEvent) {
-    emitThrottled('item-click', { item, index, event })
+    emitItemClick(item, index, event)
   }
 
   const containerStyles = computed<CSSProperties>(() => {
     const base: CSSProperties = {
       overflow: 'auto',
-      position: 'relative'
+      position: 'relative',
+      overflowAnchor: 'none'
     }
     if (props.height != null) {
       base.height = typeof props.height === 'number' ? `${props.height}px` : props.height

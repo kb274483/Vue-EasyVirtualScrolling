@@ -9,6 +9,7 @@
         :dynamic="true"
         key-field="id"
         @scroll="onScroll"
+        @item-click="onItemClick"
       >
         <template #default="{ item, index }">
           <div style="height:100%; padding:0 12px; border-bottom:1px solid #eee;">
@@ -40,4 +41,9 @@ onMounted(async () => {
 const onScroll = (payload) => {
   console.log('onScroll', payload)
 }
+
+const onItemClick = (payload) => {
+  console.log('onItemClick', payload)
+}
+
 </script>
