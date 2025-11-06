@@ -1,7 +1,7 @@
 {
-  "name": "vue3-easy-virtual-scroll",
+  "name": "roy-vue-virtual-scroll",
   "version": "0.0.1",
-  "description": "Vue 3 虛擬滾動組件（架構樣板）",
+  "description": "Vue 3 簡易虛擬滾動套件",
   "main": "dist/virtual-scroll.umd.js",
   "module": "dist/virtual-scroll.es.js",
   "types": "dist/index.d.ts",
