@@ -50,6 +50,7 @@
     height?: number | string
     direction?: Direction
     dynamic?: boolean
+    useWorker?: boolean
     tag?: string
     innerTag?: string
     itemTag?: string
@@ -68,7 +69,8 @@
     dynamic: false,
     tag: 'div',
     innerTag: 'div',
-    itemTag: 'div'
+    itemTag: 'div',
+    useWorker: false
   })
 
   const emit = defineEmits<{
@@ -111,7 +113,8 @@
         itemSize: computed(() => props.itemSize),
         overscan: props.overscan,
         direction: props.direction,
-        dynamic: props.dynamic
+        dynamic: props.dynamic,
+        useWorker: props.useWorker
       })
 
   const visibleItems = computed<Item[]>(() => {

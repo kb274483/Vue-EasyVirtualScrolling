@@ -13,6 +13,7 @@ export interface VScrollOptions{
   itemCount: number  | Ref<number>
   overscan: number
   dynamic?: boolean
+  useWorker?: boolean
 }
 
 export interface ScrollPayload {
